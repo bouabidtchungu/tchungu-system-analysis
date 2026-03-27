@@ -1,0 +1,53 @@
+{
+  "entities": {
+    "Fighter": {
+      "title": "Fighter Profile",
+      "description": "A profile for a combat sports athlete.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "The fighter's full name." },
+        "stance": { "type": "string", "enum": ["Orthodox", "Southpaw", "Switch"], "description": "The fighter's fighting stance." },
+        "reach": { "type": "number", "description": "The fighter's reach in inches." },
+        "height": { "type": "number", "description": "The fighter's height in inches." },
+        "weight": { "type": "number", "description": "The fighter's weight in lbs." },
+        "record": {
+          "type": "object",
+          "properties": {
+            "wins": { "type": "integer" },
+            "losses": { "type": "integer" },
+            "draws": { "type": "integer" }
+          },
+          "description": "The fighter's professional record."
+        },
+        "ownerId": { "type": "string", "description": "The UID of the user who owns this profile." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the profile was created." },
+        "notes": { "type": "string", "description": "Free-text notes or comments about the fighter." }
+      },
+      "required": ["name", "stance", "ownerId", "createdAt"]
+    },
+    "Analysis": {
+      "title": "Combat Analysis Result",
+      "description": "An AI-generated analysis of a combat event.",
+      "type": "object",
+      "properties": {
+        "fighterId": { "type": "string", "description": "The ID of the fighter this analysis is linked to." },
+        "scores": { "type": "array", "description": "The 7-pillar scores." },
+        "summary": { "type": "string", "description": "The AI-generated summary." },
+        "roundWinner": { "type": "string", "enum": ["Red", "Blue"], "description": "The winner of the round." },
+        "timestamp": { "type": "string", "format": "date-time", "description": "When the analysis was performed." },
+        "ownerId": { "type": "string", "description": "The UID of the user who performed this analysis." }
+      },
+      "required": ["fighterId", "scores", "summary", "timestamp", "ownerId"]
+    }
+  },
+  "firestore": {
+    "/fighters/{fighterId}": {
+      "schema": "Fighter",
+      "description": "Collection of fighter profiles."
+    },
+    "/analyses/{analysisId}": {
+      "schema": "Analysis",
+      "description": "Collection of combat analysis results."
+    }
+  }
+}

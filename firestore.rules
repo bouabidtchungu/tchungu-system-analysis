@@ -1,0 +1,86 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    // Collection: fighters
+    // Document ID: auto-generated
+    // Fields:
+    //   - name: string (required)
+    //   - stance: string (required, enum: Orthodox, Southpaw, Switch)
+    //   - reach: number (optional)
+    //   - height: number (optional)
+    //   - ownerId: string (required, matches auth.uid)
+    //   - createdAt: string (required, ISO 8601)
+    //
+    // Collection: analyses
+    // Document ID: auto-generated
+    // Fields:
+    //   - fighterId: string (required)
+    //   - scores: list (required)
+    //   - summary: string (required)
+    //   - roundWinner: string (optional, enum: Red, Blue)
+    //   - timestamp: string (required, ISO 8601)
+    //   - ownerId: string (required, matches auth.uid)
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidFighter(data) {
+      return data.keys().hasAll(['name', 'stance', 'ownerId', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.stance in ['Orthodox', 'Southpaw', 'Switch'] &&
+             data.ownerId == request.auth.uid &&
+             data.createdAt is string &&
+             (!('reach' in data) || data.reach is number) &&
+             (!('height' in data) || data.height is number) &&
+             (!('weight' in data) || data.weight is number) &&
+             (!('record' in data) || (
+               data.record is map &&
+               data.record.keys().hasAll(['wins', 'losses', 'draws']) &&
+               data.record.wins is number &&
+               data.record.losses is number &&
+               data.record.draws is number
+             )) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() < 5000)) &&
+             (!('photoUrl' in data) || (data.photoUrl is string && isValidUrl(data.photoUrl)));
+    }
+
+    function isValidAnalysis(data) {
+      return data.keys().hasAll(['fighterId', 'scores', 'summary', 'timestamp', 'ownerId']) &&
+             data.fighterId is string &&
+             data.scores is list &&
+             data.summary is string && data.summary.size() < 5000 &&
+             data.timestamp is string &&
+             data.ownerId == request.auth.uid;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /fighters/{fighterId} {
+      allow read: if isOwner(resource.data.ownerId);
+      allow create: if isAuthenticated() && isValidFighter(request.resource.data);
+      allow update: if isOwner(resource.data.ownerId) && isValidFighter(request.resource.data);
+      allow delete: if isOwner(resource.data.ownerId);
+    }
+
+    match /analyses/{analysisId} {
+      allow read: if isOwner(resource.data.ownerId);
+      allow create: if isAuthenticated() && isValidAnalysis(request.resource.data);
+      allow update: if isOwner(resource.data.ownerId) && isValidAnalysis(request.resource.data);
+      allow delete: if isOwner(resource.data.ownerId);
+    }
+  }
+}

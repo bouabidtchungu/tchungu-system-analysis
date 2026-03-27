@@ -1,0 +1,7 @@
+{
+  "name": "TCHUNGU System",
+  "description": "AI-Powered Combat Sports Adjudication using the 7-Pillar Framework (Technique, Combat, Harmony, Union, Notes, Gesture, Ultimate).",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
