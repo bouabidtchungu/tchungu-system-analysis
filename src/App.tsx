@@ -29,7 +29,8 @@ import {
   ArrowLeft,
   TrendingUp,
   Camera,
-  Link
+  Link,
+  Clock
 } from "lucide-react";
 import { 
   Radar, 
@@ -79,8 +80,8 @@ const PILLAR_ICONS: Record<string, any> = {
   [Pillar.COMBAT]: Activity,
   [Pillar.HARMONY]: Shield,
   [Pillar.UNION]: Maximize,
-  [Pillar.NOTES]: Brain,
-  [Pillar.GESTURE]: Zap,
+  [Pillar.NODES]: Brain,
+  [Pillar.GESTUELLE]: Zap,
   [Pillar.ULTIMATE]: Trophy,
 };
 
@@ -89,8 +90,8 @@ const PILLAR_COLORS: Record<string, string> = {
   [Pillar.COMBAT]: "#ef4444",    // red
   [Pillar.HARMONY]: "#10b981",   // emerald
   [Pillar.UNION]: "#8b5cf6",    // violet
-  [Pillar.NOTES]: "#f59e0b",    // amber
-  [Pillar.GESTURE]: "#06b6d4",   // cyan
+  [Pillar.NODES]: "#f59e0b",    // amber
+  [Pillar.GESTUELLE]: "#06b6d4",   // cyan
   [Pillar.ULTIMATE]: "#ec4899",  // pink
 };
 
@@ -130,6 +131,7 @@ export default function App() {
   const [fighterPhoto, setFighterPhoto] = useState<File | null>(null);
   const [fighterPhotoPreview, setFighterPhotoPreview] = useState<string | null>(null);
   const [isAddingFighter, setIsAddingFighter] = useState(false);
+  const [selectedPillarForDetail, setSelectedPillarForDetail] = useState<string | null>(null);
 
   // History State
   const [analyses, setAnalyses] = useState<AnalysisResult[]>([]);
@@ -677,7 +679,11 @@ export default function App() {
                         {result?.scores.map((score) => {
                           const Icon = PILLAR_ICONS[score.pillar] || Activity;
                           return (
-                            <div key={score.pillar} className="p-4 bg-white/5 border border-white/10 rounded-xl space-y-3 group hover:bg-white/10 transition-colors">
+                            <button 
+                              key={score.pillar} 
+                              onClick={() => setSelectedPillarForDetail(score.pillar)}
+                              className="p-4 bg-white/5 border border-white/10 rounded-xl space-y-3 group hover:bg-white/10 hover:border-red-500/50 transition-all text-left"
+                            >
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                   <div className="p-2 rounded-lg bg-white/5 text-red-500 group-hover:bg-red-500 group-hover:text-white transition-all">
@@ -687,12 +693,104 @@ export default function App() {
                                 </div>
                                 <span className="text-lg font-black font-mono text-red-500">{score.score.toFixed(1)}</span>
                               </div>
-                              <p className="text-[11px] text-white/40 leading-relaxed line-clamp-3 group-hover:text-white/70 transition-colors">
+                              <p className="text-[11px] text-white/40 leading-relaxed line-clamp-2 group-hover:text-white/70 transition-colors">
                                 {score.description}
                               </p>
-                            </div>
+                              <div className="flex items-center gap-1 pt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <span className="text-[8px] font-bold uppercase tracking-widest text-red-500">View Decomposition</span>
+                                <ChevronRight className="w-2 h-2 text-red-500" />
+                              </div>
+                            </button>
                           );
                         })}
+                      </div>
+
+                      {/* Meticulous Movement Analysis */}
+                      {result?.keyMovements && result.keyMovements.length > 0 && (
+                        <div className="pt-8 border-t border-white/10 space-y-6">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-xs font-bold uppercase tracking-widest text-red-500 flex items-center gap-2">
+                              <Clock className="w-4 h-4" />
+                              Meticulous Movement Analysis
+                            </h4>
+                            <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest">Coach-Level Technical Breakdown</span>
+                          </div>
+                          <div className="overflow-hidden border border-white/10 rounded-2xl bg-white/5">
+                            <table className="w-full text-left border-collapse">
+                              <thead>
+                                <tr className="border-b border-white/10 bg-white/5">
+                                  <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-white/40">Time</th>
+                                  <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-white/40">Movement</th>
+                                  <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-white/40">Reaction</th>
+                                  <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-white/40">Pillar</th>
+                                  <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-white/40">Impact</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-white/5">
+                                {result.keyMovements.map((move, i) => (
+                                  <tr key={i} className="hover:bg-white/5 transition-colors group">
+                                    <td className="px-6 py-4 text-xs font-mono text-red-500 font-bold">{move.timestamp}</td>
+                                    <td className="px-6 py-4 text-xs text-white/80 leading-relaxed">{move.movement}</td>
+                                    <td className="px-6 py-4 text-xs text-white/60 leading-relaxed italic">{move.reaction}</td>
+                                    <td className="px-6 py-4">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: PILLAR_COLORS[move.pillar] }} />
+                                        <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">{move.pillar}</span>
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-xs text-white/80 leading-relaxed font-medium">{move.impact}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Insights, Strengths, Weaknesses */}
+                      <div className="grid md:grid-cols-3 gap-6 pt-8 border-t border-white/10">
+                        <div className="space-y-4">
+                          <h4 className="text-xs font-bold uppercase tracking-widest text-red-500 flex items-center gap-2">
+                            <Brain className="w-4 h-4" />
+                            Tactical Insights
+                          </h4>
+                          <ul className="space-y-2">
+                            {result?.tacticalInsights?.map((insight, i) => (
+                              <li key={i} className="text-xs text-white/60 leading-relaxed flex gap-2">
+                                <span className="text-red-500 font-bold">•</span>
+                                {insight}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        <div className="space-y-4">
+                          <h4 className="text-xs font-bold uppercase tracking-widest text-emerald-500 flex items-center gap-2">
+                            <TrendingUp className="w-4 h-4" />
+                            Key Strengths
+                          </h4>
+                          <ul className="space-y-2">
+                            {result?.strengths?.map((strength, i) => (
+                              <li key={i} className="text-xs text-white/60 leading-relaxed flex gap-2">
+                                <span className="text-emerald-500 font-bold">+</span>
+                                {strength}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        <div className="space-y-4">
+                          <h4 className="text-xs font-bold uppercase tracking-widest text-amber-500 flex items-center gap-2">
+                            <Target className="w-4 h-4" />
+                            Critical Weaknesses
+                          </h4>
+                          <ul className="space-y-2">
+                            {result?.weaknesses?.map((weakness, i) => (
+                              <li key={i} className="text-xs text-white/60 leading-relaxed flex gap-2">
+                                <span className="text-amber-500 font-bold">-</span>
+                                {weakness}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -700,6 +798,86 @@ export default function App() {
               )}
             </motion.div>
           )}
+
+          {/* Pillar Detail Modal */}
+          <AnimatePresence>
+            {selectedPillarForDetail && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl"
+              >
+                <motion.div 
+                  initial={{ scale: 0.9, y: 20 }}
+                  animate={{ scale: 1, y: 0 }}
+                  exit={{ scale: 0.9, y: 20 }}
+                  className="w-full max-w-4xl bg-[#0f0f0f] border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
+                >
+                  <div className="p-8 border-b border-white/10 flex items-center justify-between bg-white/5">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 rounded-xl bg-red-600 text-white shadow-lg shadow-red-600/20">
+                        {(() => {
+                          const Icon = PILLAR_ICONS[selectedPillarForDetail] || Activity;
+                          return <Icon className="w-6 h-6" />;
+                        })()}
+                      </div>
+                      <div>
+                        <h3 className="text-2xl font-black uppercase italic tracking-tighter">
+                          {selectedPillarForDetail} <span className="text-red-600">Decomposition</span>
+                        </h3>
+                        <p className="text-xs font-mono text-white/40 uppercase tracking-widest">Hierarchical Analysis Model</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setSelectedPillarForDetail(null)}
+                      className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
+                    >
+                      ×
+                    </button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-8 space-y-8">
+                    {result?.scores.find(s => s.pillar === selectedPillarForDetail)?.components.map((comp, i) => (
+                      <div key={i} className="space-y-4">
+                        <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                          <h4 className="text-sm font-bold uppercase tracking-widest text-white/80">{comp.name}</h4>
+                          <div className="flex items-center gap-2">
+                            <div className="h-1 w-24 bg-white/5 rounded-full overflow-hidden">
+                              <div className="h-full bg-red-600" style={{ width: `${comp.score * 10}%` }} />
+                            </div>
+                            <span className="text-sm font-black font-mono text-red-500">{comp.score.toFixed(1)}</span>
+                          </div>
+                        </div>
+                        <div className="grid md:grid-cols-2 gap-4">
+                          {comp.subComponents.map((sub, j) => (
+                            <div key={j} className="p-4 bg-white/5 border border-white/5 rounded-xl space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">{sub.name}</span>
+                                <span className="text-xs font-black font-mono text-red-500">{sub.score.toFixed(1)}</span>
+                              </div>
+                              <p className="text-[11px] text-white/60 leading-relaxed italic">
+                                {sub.description}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="p-6 bg-white/5 border-t border-white/10 flex justify-end">
+                    <button 
+                      onClick={() => setSelectedPillarForDetail(null)}
+                      className="px-8 py-3 bg-white/10 hover:bg-white/20 rounded-full text-xs font-bold uppercase tracking-widest transition-all"
+                    >
+                      Close Analysis
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {activeTab === "fighters" && (
             <motion.div
@@ -1011,14 +1189,14 @@ export default function App() {
                     color: PILLAR_COLORS[Pillar.UNION]
                   },
                   {
-                    pillar: Pillar.NOTES,
-                    description: "Strategic adaptability and pattern recognition. Identifies successful adjustments to opponent tendencies across multiple rounds.",
-                    color: PILLAR_COLORS[Pillar.NOTES]
+                    pillar: Pillar.NODES,
+                    description: "Strategic targeting and anatomical vulnerability mapping. Identifies high-value strike zones and critical control points in grappling exchanges.",
+                    color: PILLAR_COLORS[Pillar.NODES]
                   },
                   {
-                    pillar: Pillar.GESTURE,
-                    description: "Psychological presence and feint efficiency. Measures the impact of non-striking movements on opponent defensive reactions.",
-                    color: PILLAR_COLORS[Pillar.GESTURE]
+                    pillar: Pillar.GESTUELLE,
+                    description: "Psychological presence and non-verbal deception. Measures the effectiveness of feints and the impact of body language on opponent behavior.",
+                    color: PILLAR_COLORS[Pillar.GESTUELLE]
                   },
                   {
                     pillar: Pillar.ULTIMATE,
@@ -1514,6 +1692,42 @@ function FighterDetailView({
                 </p>
               </div>
             </div>
+
+            {analyses.length > 0 && analyses[0].keyMovements && (
+              <div className="p-8 bg-white/5 border border-white/10 rounded-2xl space-y-6">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-red-500" />
+                    Latest Meticulous Analysis
+                  </h4>
+                  <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest">
+                    Session: {new Date(analyses[0].timestamp).toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-white/10">
+                        <th className="pb-4 text-[10px] font-bold uppercase tracking-widest text-white/40">Time</th>
+                        <th className="pb-4 text-[10px] font-bold uppercase tracking-widest text-white/40">Movement</th>
+                        <th className="pb-4 text-[10px] font-bold uppercase tracking-widest text-white/40">Reaction</th>
+                        <th className="pb-4 text-[10px] font-bold uppercase tracking-widest text-white/40">Impact</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {analyses[0].keyMovements.map((move, i) => (
+                        <tr key={i} className="hover:bg-white/5 transition-colors">
+                          <td className="py-4 text-xs font-mono text-red-500 font-bold">{move.timestamp}</td>
+                          <td className="py-4 text-xs text-white/80 pr-4">{move.movement}</td>
+                          <td className="py-4 text-xs text-white/60 italic pr-4">{move.reaction}</td>
+                          <td className="py-4 text-xs text-white/80">{move.impact}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
