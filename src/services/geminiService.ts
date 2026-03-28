@@ -241,3 +241,36 @@ export async function analyzeCombatVideoUrl(
     timestamp: new Date().toISOString(),
   };
 }
+
+export async function chatWithTchunguExpert(
+  message: string,
+  history: { role: "user" | "model"; parts: { text: string }[] }[] = []
+) {
+  const systemInstruction = `
+    You are an AI expert in the TCHUNGU System Philosophy. 
+    TCHUNGU is a proprietary biomechanical adjudication framework designed to eliminate subjective human error in combat sports.
+    
+    Your goal is to help users understand every term, branch, and mechanical aspect of the TCHUNGU system.
+    You should be able to explain:
+    - The meaning of "Technique" and its branches (Mechanics, Execution, Timing, Distance, Angles, Reflex).
+    - The 7 Pillars: Technique, Combat, Harmony, Union, Nodes, Gestuelle, and Ultimate Synthesis.
+    - How analysis is performed: Digitizing kinetic energy, spatial positioning, and technical execution.
+    - Biomechanical aspects: Center of Gravity (COG), kinetic chains, energy transfer, joint stacking.
+    - The philosophy: Replacing human judges with mathematical truth and AI-powered objective adjudication.
+    
+    Be professional, detailed, and authoritative. Use the TCHUNGU terminology consistently.
+    If a user asks about a specific analysis, explain the general principles that would apply.
+    Encourage deep exploration of the system to increase user confidence and reliability.
+  `;
+
+  const chat = ai.chats.create({
+    model: "gemini-3-flash-preview",
+    config: {
+      systemInstruction,
+    },
+    history: history,
+  });
+
+  const response = await chat.sendMessage({ message });
+  return response.text;
+}

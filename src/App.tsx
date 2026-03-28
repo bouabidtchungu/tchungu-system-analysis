@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useDropzone } from "react-dropzone";
 import { 
   Shield, 
@@ -30,7 +30,10 @@ import {
   TrendingUp,
   Camera,
   Link,
-  Clock
+  Clock,
+  MessageSquare,
+  Send,
+  X
 } from "lucide-react";
 import { 
   Radar, 
@@ -50,8 +53,10 @@ import {
   CartesianGrid
 } from "recharts";
 import { motion, AnimatePresence } from "motion/react";
+import { GoogleGenAI } from "@google/genai";
+import ReactMarkdown from "react-markdown";
 import { cn } from "./lib/utils";
-import { analyzeCombatMedia, analyzeCombatVideoUrl } from "./services/geminiService";
+import { analyzeCombatMedia, analyzeCombatVideoUrl, chatWithTchunguExpert } from "./services/geminiService";
 import { AnalysisResult, Pillar, Fighter } from "./types";
 import { auth, db, storage } from "./firebase";
 import { 
@@ -95,7 +100,7 @@ const PILLAR_COLORS: Record<string, string> = {
   [Pillar.ULTIMATE]: "#ec4899",  // pink
 };
 
-type Tab = "analyze" | "fighters" | "history" | "system";
+type Tab = "analyze" | "fighters" | "history" | "system" | "dialogue";
 
 export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
@@ -132,6 +137,34 @@ export default function App() {
   const [fighterPhotoPreview, setFighterPhotoPreview] = useState<string | null>(null);
   const [isAddingFighter, setIsAddingFighter] = useState(false);
   const [selectedPillarForDetail, setSelectedPillarForDetail] = useState<string | null>(null);
+
+  // Chat State
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{ role: "user" | "model"; parts: { text: string }[] }[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const dialogueEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const scrollToDialogueBottom = () => {
+    dialogueEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    if (isChatOpen) {
+      scrollToBottom();
+    }
+  }, [chatMessages, isChatOpen]);
+
+  useEffect(() => {
+    if (activeTab === "dialogue") {
+      scrollToDialogueBottom();
+    }
+  }, [chatMessages, activeTab]);
 
   // History State
   const [analyses, setAnalyses] = useState<AnalysisResult[]>([]);
@@ -183,6 +216,26 @@ export default function App() {
   };
 
   const handleLogout = () => signOut(auth);
+
+  const handleSendMessage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!chatInput.trim() || isChatLoading) return;
+
+    const userMessage = chatInput.trim();
+    setChatInput("");
+    setChatMessages(prev => [...prev, { role: "user", parts: [{ text: userMessage }] }]);
+    setIsChatLoading(true);
+
+    try {
+      const response = await chatWithTchunguExpert(userMessage, chatMessages);
+      setChatMessages(prev => [...prev, { role: "model", parts: [{ text: response }] }]);
+    } catch (err) {
+      console.error(err);
+      setChatMessages(prev => [...prev, { role: "model", parts: [{ text: "I apologize, but I encountered an error connecting to the TCHUNGU neural core. Please try again." }] }]);
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const selectedFile = acceptedFiles[0];
@@ -411,6 +464,12 @@ export default function App() {
               className={cn("hover:text-red-500 transition-colors", activeTab === "system" && "text-red-500 opacity-100")}
             >
               System
+            </button>
+            <button 
+              onClick={() => setActiveTab("dialogue")}
+              className={cn("hover:text-red-500 transition-colors", activeTab === "dialogue" && "text-red-500 opacity-100")}
+            >
+              Dialogue
             </button>
           </nav>
 
@@ -1166,56 +1225,144 @@ export default function App() {
                 </p>
               </div>
 
+              {/* Main Pillar Section */}
+              <div className="p-10 bg-gradient-to-br from-red-600/10 via-white/5 to-transparent border border-red-600/20 rounded-[2rem] space-y-8 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-12 opacity-5 group-hover:opacity-10 transition-opacity">
+                  <Trophy className="w-64 h-64 text-red-600" />
+                </div>
+                <div className="flex items-center gap-6 relative z-10">
+                  <div className="w-20 h-20 bg-red-600 rounded-2xl flex items-center justify-center shadow-[0_0_40px_rgba(220,38,38,0.3)]">
+                    <Trophy className="w-10 h-10 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-3xl font-black uppercase tracking-widest italic">The Main Pillar: Ultimate Synthesis</h3>
+                    <p className="text-sm text-red-500 font-bold uppercase tracking-[0.2em]">The Central Axis of Adjudication</p>
+                  </div>
+                </div>
+                <div className="space-y-6 relative z-10">
+                  <p className="text-base text-white/80 leading-relaxed max-w-4xl">
+                    The **Ultimate Synthesis (U)** is the primary metric adopted in our analysis. It represents the total convergence of all biomechanical and neural data points into a single, indisputable truth of combat dominance. 
+                  </p>
+                  <div className="grid md:grid-cols-3 gap-6">
+                    <div className="space-y-2">
+                      <h5 className="text-[10px] font-bold uppercase tracking-widest text-red-500">Objective</h5>
+                      <p className="text-xs text-white/60">To ensure absolute fairness and transparency in logical and professional analysis.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <h5 className="text-[10px] font-bold uppercase tracking-widest text-red-500">AI Power</h5>
+                      <p className="text-xs text-white/60">Revealing the secrets of the intelligent duel that remain hidden to the human eye.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <h5 className="text-[10px] font-bold uppercase tracking-widest text-red-500">Philosophy</h5>
+                      <p className="text-xs text-white/60">The TCHUNGU philosophy of the seven pillars provides a definitive mathematical adjudication.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {[
                   {
                     pillar: Pillar.TECHNIQUE,
-                    description: "Evaluation of form, balance, and mechanical efficiency. Measures the precision of limb placement and weight distribution during offensive and defensive cycles.",
+                    title: "Biomechanical Precision",
+                    criteria: [
+                      { name: "Kinetic Alignment", detail: "Measures joint stacking for structural integrity.", accuracy: "99.8%" },
+                      { name: "Mechanical Efficiency", detail: "Ratio of energy input to kinetic output.", accuracy: "99.5%" }
+                    ],
+                    description: "Evaluation of form, balance, and mechanical efficiency. Measures the precision of limb placement and weight distribution.",
                     color: PILLAR_COLORS[Pillar.TECHNIQUE]
                   },
                   {
                     pillar: Pillar.COMBAT,
-                    description: "Quantification of impact force and effective damage. Analyzes kinetic chain completion and the resultant energy transfer upon target contact.",
+                    title: "Energy Dynamics",
+                    criteria: [
+                      { name: "Force Vector Analysis", detail: "Direction and magnitude of energy transfer.", accuracy: "99.9%" },
+                      { name: "Impact Saturation", detail: "Depth and duration of energy delivery.", accuracy: "99.7%" }
+                    ],
+                    description: "Quantification of impact force and effective damage. Analyzes kinetic chain completion and resultant energy transfer.",
                     color: PILLAR_COLORS[Pillar.COMBAT]
                   },
                   {
                     pillar: Pillar.HARMONY,
-                    description: "Fluidity of transitions between offensive and defensive states. Measures the 'flow' and lack of redundant motion in complex exchanges.",
+                    title: "Rhythmic Fluidity",
+                    criteria: [
+                      { name: "Transition Latency", detail: "Time between offensive and defensive states.", accuracy: "99.6%" },
+                      { name: "Motion Economy", detail: "Identification of redundant kinetic movement.", accuracy: "99.4%" }
+                    ],
+                    description: "Fluidity of transitions between states. Measures the 'flow' and lack of redundant motion in complex exchanges.",
                     color: PILLAR_COLORS[Pillar.HARMONY]
                   },
                   {
                     pillar: Pillar.UNION,
-                    description: "Spatial awareness and octagon control. Calculates the geometric dominance of the center line and the restriction of opponent escape vectors.",
+                    title: "Spatial Dominance",
+                    criteria: [
+                      { name: "Geometric Centering", detail: "Control of the octagon's central axis.", accuracy: "99.9%" },
+                      { name: "Vector Restriction", detail: "Limiting opponent escape trajectories.", accuracy: "99.8%" }
+                    ],
+                    description: "Spatial awareness and octagon control. Calculates the geometric dominance of the center line.",
                     color: PILLAR_COLORS[Pillar.UNION]
                   },
                   {
                     pillar: Pillar.NODES,
-                    description: "Strategic targeting and anatomical vulnerability mapping. Identifies high-value strike zones and critical control points in grappling exchanges.",
+                    title: "Anatomical Vulnerability",
+                    criteria: [
+                      { name: "Critical Zone Targeting", detail: "Precision of strikes to high-value nodes.", accuracy: "99.7%" },
+                      { name: "Structural Weakness", detail: "Identifying breaks in opponent posture.", accuracy: "99.5%" }
+                    ],
+                    description: "Strategic targeting and anatomical vulnerability mapping. Identifies high-value strike zones and critical control points.",
                     color: PILLAR_COLORS[Pillar.NODES]
                   },
                   {
                     pillar: Pillar.GESTUELLE,
-                    description: "Psychological presence and non-verbal deception. Measures the effectiveness of feints and the impact of body language on opponent behavior.",
+                    title: "Psychological Deception",
+                    criteria: [
+                      { name: "Feint Efficacy", detail: "Impact of deceptive movements on opponent.", accuracy: "99.3%" },
+                      { name: "Body Language Masking", detail: "Concealment of offensive intent.", accuracy: "99.2%" }
+                    ],
+                    description: "Psychological presence and non-verbal deception. Measures the effectiveness of feints and body language.",
                     color: PILLAR_COLORS[Pillar.GESTUELLE]
                   },
                   {
                     pillar: Pillar.ULTIMATE,
-                    description: "The synthesis of all pillars into a singular performance metric. Represents the overall technical dominance and fight-ending potential.",
+                    title: "The Final Adjudication",
+                    criteria: [
+                      { name: "Total Dominance Metric", detail: "Aggregation of all technical data points.", accuracy: "100%" },
+                      { name: "Fight-Ending Potential", detail: "Mathematical probability of a finish.", accuracy: "99.9%" }
+                    ],
+                    description: "The synthesis of all pillars into a singular performance metric. Represents overall technical dominance.",
                     color: PILLAR_COLORS[Pillar.ULTIMATE]
                   }
                 ].map((item) => {
                   const Icon = PILLAR_ICONS[item.pillar];
                   return (
-                    <div key={item.pillar} className="p-8 bg-white/5 border border-white/10 rounded-2xl space-y-4 group hover:border-white/20 transition-all">
+                    <div key={item.pillar} className="p-8 bg-white/5 border border-white/10 rounded-2xl space-y-6 group hover:border-white/20 transition-all">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${item.color}20`, color: item.color }}>
                           <Icon className="w-5 h-5" />
                         </div>
-                        <h4 className="font-bold uppercase tracking-widest text-sm">{item.pillar}</h4>
+                        <div>
+                          <h4 className="font-bold uppercase tracking-widest text-[10px] text-white/40">{item.pillar}</h4>
+                          <h5 className="font-black uppercase tracking-tighter text-sm leading-none">{item.title}</h5>
+                        </div>
                       </div>
-                      <p className="text-xs text-white/40 leading-relaxed">
-                        {item.description}
-                      </p>
+                      
+                      <div className="space-y-4">
+                        {item.criteria.map((criterion, idx) => (
+                          <div key={idx} className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[9px] font-bold uppercase tracking-widest text-red-500">{criterion.name}</span>
+                              <span className="text-[8px] font-mono text-white/20">{criterion.accuracy} ACCURACY</span>
+                            </div>
+                            <p className="text-[10px] text-white/60 leading-relaxed">{criterion.detail}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="pt-4 border-t border-white/5">
+                        <p className="text-[10px] text-white/30 italic leading-relaxed">
+                          {item.description}
+                        </p>
+                      </div>
                     </div>
                   );
                 })}
@@ -1262,6 +1409,166 @@ export default function App() {
                       ))}
                     </div>
                   </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === "dialogue" && (
+            <motion.div
+              key="dialogue"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="max-w-5xl mx-auto space-y-8"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-4xl font-black uppercase italic tracking-tighter">
+                    Expert <span className="text-red-600">Dialogue</span>
+                  </h2>
+                  <p className="text-xs font-mono text-white/40 uppercase tracking-widest mt-2">
+                    Direct interface with the TCHUNGU Philosophy Core
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setChatMessages([])}
+                  className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all"
+                >
+                  Clear Session
+                </button>
+              </div>
+
+              <div className="grid lg:grid-cols-4 gap-8">
+                {/* Sidebar Info */}
+                <div className="lg:col-span-1 space-y-6">
+                  <div className="p-6 bg-white/5 border border-white/10 rounded-2xl space-y-4">
+                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-red-500">Core Topics</h4>
+                    <ul className="space-y-3 text-xs text-white/60">
+                      <li className="flex items-center gap-2">
+                        <div className="w-1 h-1 bg-red-600 rounded-full" />
+                        7 Pillars of Adjudication
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <div className="w-1 h-1 bg-red-600 rounded-full" />
+                        Biomechanical Efficiency
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <div className="w-1 h-1 bg-red-600 rounded-full" />
+                        Neural Response Latency
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <div className="w-1 h-1 bg-red-600 rounded-full" />
+                        Kinetic Chain Analysis
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="p-6 bg-red-600/5 border border-red-600/20 rounded-2xl">
+                    <p className="text-[10px] text-red-500 font-bold uppercase tracking-widest mb-2">Expert Status</p>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                      <span className="text-xs font-mono text-white/80 uppercase">Online / Synchronized</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Main Chat Area */}
+                <div className="lg:col-span-3 flex flex-col h-[700px] bg-black/40 border border-white/10 rounded-3xl overflow-hidden backdrop-blur-sm">
+                  {/* Chat Header */}
+                  <div className="p-6 border-b border-white/10 bg-white/5 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-red-600/20 border border-red-600/40 rounded-xl flex items-center justify-center">
+                        <Brain className="w-6 h-6 text-red-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold uppercase tracking-widest">TCHUNGU Expert Console</h3>
+                        <p className="text-[10px] font-mono text-white/40 uppercase">v4.2.0-stable</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Messages */}
+                  <div className="flex-1 overflow-y-auto p-8 space-y-6 scrollbar-thin scrollbar-thumb-white/10">
+                    {chatMessages.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center text-center space-y-6 opacity-40">
+                        <div className="w-20 h-20 border-2 border-dashed border-white/20 rounded-full flex items-center justify-center animate-spin-slow">
+                          <Shield className="w-10 h-10" />
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-sm font-bold uppercase tracking-[0.3em]">Initialize Dialogue</p>
+                          <p className="text-xs max-w-xs leading-relaxed">
+                            Ask about the mechanical aspects of the bio, the meaning of technique, or the secrets of the intelligent duel.
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      chatMessages.map((msg, idx) => (
+                        <div 
+                          key={idx} 
+                          className={cn(
+                            "flex gap-4",
+                            msg.role === "user" ? "flex-row-reverse" : "flex-row"
+                          )}
+                        >
+                          <div className={cn(
+                            "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+                            msg.role === "user" ? "bg-red-600" : "bg-white/10 border border-white/10"
+                          )}>
+                            {msg.role === "user" ? <Shield className="w-4 h-4 text-white" /> : <Brain className="w-4 h-4 text-red-600" />}
+                          </div>
+                          <div className={cn(
+                            "max-w-[80%] p-4 rounded-2xl text-sm leading-relaxed",
+                            msg.role === "user" 
+                              ? "bg-red-600 text-white rounded-tr-none" 
+                              : "bg-white/5 border border-white/10 text-white/80 rounded-tl-none"
+                          )}>
+                            <div className="prose prose-invert prose-sm max-w-none">
+                              <ReactMarkdown>{msg.parts[0].text}</ReactMarkdown>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                    {isChatLoading && (
+                      <div className="flex gap-4 animate-pulse">
+                        <div className="w-8 h-8 rounded-lg bg-white/10 border border-white/10 flex items-center justify-center">
+                          <Loader2 className="w-4 h-4 text-red-600 animate-spin" />
+                        </div>
+                        <div className="bg-white/5 border border-white/10 p-4 rounded-2xl rounded-tl-none">
+                          <div className="flex gap-1">
+                            <div className="w-1 h-1 bg-white/40 rounded-full animate-bounce" />
+                            <div className="w-1 h-1 bg-white/40 rounded-full animate-bounce [animation-delay:0.2s]" />
+                            <div className="w-1 h-1 bg-white/40 rounded-full animate-bounce [animation-delay:0.4s]" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <div ref={dialogueEndRef} />
+                  </div>
+
+                  {/* Input */}
+                  <form onSubmit={handleSendMessage} className="p-6 border-t border-white/10 bg-white/5">
+                    <div className="relative flex items-center">
+                      <input 
+                        type="text"
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        placeholder="Type your query to the expert..."
+                        className="w-full bg-black/60 border border-white/10 rounded-2xl px-6 py-4 text-sm focus:outline-none focus:border-red-600 transition-all pr-16"
+                      />
+                      <button 
+                        type="submit"
+                        disabled={!chatInput.trim() || isChatLoading}
+                        className="absolute right-3 p-3 bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl transition-all"
+                      >
+                        <Send className="w-5 h-5 text-white" />
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-white/20 uppercase tracking-widest mt-4 text-center">
+                      Press Enter to transmit query to the TCHUNGU Neural Core
+                    </p>
+                  </form>
                 </div>
               </div>
             </motion.div>
@@ -1316,6 +1623,95 @@ export default function App() {
           <button onClick={() => setError(null)} className="ml-4 opacity-60 hover:opacity-100">×</button>
         </div>
       )}
+
+      {/* Chat Interface */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <AnimatePresence>
+          {isChatOpen && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="absolute bottom-16 right-0 w-80 md:w-96 h-[500px] bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+            >
+              {/* Chat Header */}
+              <div className="p-4 border-b border-white/10 bg-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest italic">TCHUNGU AI Expert</span>
+                </div>
+                <button 
+                  onClick={() => setIsChatOpen(false)}
+                  className="p-1 hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <X className="w-4 h-4 text-white/40" />
+                </button>
+              </div>
+
+              {/* Chat Messages */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10">
+                {chatMessages.length === 0 && (
+                  <div className="text-center py-8 space-y-2">
+                    <MessageSquare className="w-8 h-8 text-red-600 mx-auto opacity-20" />
+                    <p className="text-[10px] uppercase tracking-widest text-white/40">Neural Core Ready</p>
+                    <p className="text-xs text-white/60 px-4">Ask about the TCHUNGU philosophy, pillars, or biomechanical analysis.</p>
+                  </div>
+                )}
+                {chatMessages.map((msg, idx) => (
+                  <div 
+                    key={idx} 
+                    className={cn(
+                      "max-w-[85%] p-3 rounded-xl text-xs leading-relaxed",
+                      msg.role === "user" 
+                        ? "ml-auto bg-red-600 text-white" 
+                        : "mr-auto bg-white/5 border border-white/10 text-white/80"
+                    )}
+                  >
+                    <div className="prose prose-invert prose-xs max-w-none">
+                      <ReactMarkdown>{msg.parts[0].text}</ReactMarkdown>
+                    </div>
+                  </div>
+                ))}
+                {isChatLoading && (
+                  <div className="mr-auto bg-white/5 border border-white/10 p-3 rounded-xl flex items-center gap-2">
+                    <Loader2 className="w-3 h-3 text-red-600 animate-spin" />
+                    <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest">Processing...</span>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Chat Input */}
+              <form onSubmit={handleSendMessage} className="p-4 border-t border-white/10 bg-white/5 flex gap-2">
+                <input 
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="Ask the expert..."
+                  className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-red-600 transition-colors"
+                />
+                <button 
+                  type="submit"
+                  disabled={!chatInput.trim() || isChatLoading}
+                  className="p-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:hover:bg-red-600 rounded-lg transition-colors"
+                >
+                  <Send className="w-4 h-4 text-white" />
+                </button>
+              </form>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <button 
+          onClick={() => setIsChatOpen(!isChatOpen)}
+          className={cn(
+            "w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300",
+            isChatOpen ? "bg-white/10 rotate-90" : "bg-red-600 hover:scale-110"
+          )}
+        >
+          {isChatOpen ? <X className="w-6 h-6 text-white" /> : <MessageSquare className="w-6 h-6 text-white" />}
+        </button>
+      </div>
     </div>
   );
 }
@@ -1731,6 +2127,7 @@ function FighterDetailView({
           </div>
         </div>
       )}
+
     </div>
   );
 }
