@@ -38,6 +38,18 @@
         "ownerId": { "type": "string", "description": "The UID of the user who performed this analysis." }
       },
       "required": ["fighterId", "scores", "summary", "timestamp", "ownerId"]
+    },
+    "ChatSession": {
+      "title": "AI Coach Chat Session",
+      "description": "A persistent conversation with the AI Coach.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "description": "The UID of the user who owns this session." },
+        "messages": { "type": "array", "description": "The list of chat messages." },
+        "analysisId": { "type": "string", "description": "Optional analysis context." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last message timestamp." }
+      },
+      "required": ["ownerId", "messages", "updatedAt"]
     }
   },
   "firestore": {
@@ -48,6 +60,10 @@
     "/analyses/{analysisId}": {
       "schema": "Analysis",
       "description": "Collection of combat analysis results."
+    },
+    "/chat_sessions/{sessionId}": {
+      "schema": "ChatSession",
+      "description": "Collection of AI Coach chat sessions."
     }
   }
 }
