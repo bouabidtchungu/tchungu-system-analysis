@@ -17,8 +17,15 @@ export interface PillarScore {
 export interface AnalysisResult {
   id?: string;
   fighterId?: string;
+  fighterName?: string; // New: Name of the fighter analyzed
   scores: PillarScore[];
   summary: string;
+  philosophicalCommentary?: string; // New: Philosophical insights
+  segments?: {
+    phase: "Opening" | "Mid-Fight" | "Critical Moment" | "End Phase";
+    timestamp: string;
+    insight: string;
+  }[]; // New: Fight segmentation
   roundWinner?: "Red" | "Blue";
   timestamp: string;
   ownerId?: string;

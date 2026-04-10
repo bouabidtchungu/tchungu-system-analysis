@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AnalysisResult, Pillar, ChatMessage } from "../types";
+import { BOOKLET_CONTENT } from "../constants/booklet";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -20,8 +21,12 @@ export async function analyzeCombatMedia(
     6. Gesture (G): Biomechanics, physics, speed, kinetic energy.
     7. Ultimate (U): Impact, finishing potential, knockdown/knockout quality.
     
-    Provide a score (0-10) for each pillar, a brief description of why that score was given, and a summary of the overall performance.
-    If multiple fighters are visible, identify them as "Red Corner" and "Blue Corner" and score the most prominent action.
+    TASKS:
+    1. Identify the fighters correctly. If multiple fighters are visible, identify them as "Red Corner" and "Blue Corner".
+    2. Provide a score (0-10) for each pillar and a brief description.
+    3. Generate a "Philosophical Commentary" in the TCHUNGU style: short sentences, deep meaning, minimal explanation, impactful tone.
+    4. Incorporate the TCHUNGU philosophy into the commentary (e.g., mention how the fighter's movement aligns with the pillars).
+    5. Segment the match into phases: Opening, Mid-Fight, Critical Moment, End Phase.
   `;
 
   const response = await ai.models.generateContent({
@@ -32,7 +37,7 @@ export async function analyzeCombatMedia(
           { text: prompt },
           {
             inlineData: {
-              data: fileData.split(",")[1], // Remove the data:image/png;base64, prefix
+              data: fileData.split(",")[1],
               mimeType: mimeType,
             },
           },
@@ -58,9 +63,22 @@ export async function analyzeCombatMedia(
             },
           },
           summary: { type: Type.STRING },
+          philosophicalCommentary: { type: Type.STRING },
+          segments: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                phase: { type: Type.STRING, enum: ["Opening", "Mid-Fight", "Critical Moment", "End Phase"] },
+                timestamp: { type: Type.STRING },
+                insight: { type: Type.STRING },
+              },
+              required: ["phase", "timestamp", "insight"],
+            },
+          },
           roundWinner: { type: Type.STRING, enum: ["Red", "Blue"] },
         },
-        required: ["scores", "summary"],
+        required: ["scores", "summary", "philosophicalCommentary", "segments", "fighterName"],
       },
     },
   });
@@ -78,6 +96,8 @@ export async function analyzeCombatVideoUrl(
   const prompt = `
     Analyze the combat sports video at this URL: ${videoUrl}
     
+    CRITICAL: First, identify the fighters and the event from the video title and content. Do NOT hallucinate other fighters (like Badr Hari) if they are not in this specific video.
+    
     Use the TCHUNGU 7-Pillar Framework for analysis:
     1. Technique (T): Cleanliness of form, defensive responsibility, precision.
     2. Combat (C): Volume, aggression, engagement rate.
@@ -87,8 +107,12 @@ export async function analyzeCombatVideoUrl(
     6. Gesture (G): Biomechanics, physics, speed, kinetic energy.
     7. Ultimate (U): Impact, finishing potential, knockdown/knockout quality.
     
-    Provide a score (0-10) for each pillar, a brief description of why that score was given, and a summary of the overall performance.
-    Identify the fighters and score the most prominent action.
+    TASKS:
+    1. Identify the fighters and the event accurately.
+    2. Provide a score (0-10) for each pillar and a brief description.
+    3. Generate a "Philosophical Commentary" in the TCHUNGU style: short sentences, deep meaning, minimal explanation, impactful tone.
+    4. Explain the TCHUNGU philosophy through this commentary, linking the fighter's actions to the 7 pillars.
+    5. Segment the match into phases: Opening, Mid-Fight, Critical Moment, End Phase.
   `;
 
   const response = await ai.models.generateContent({
@@ -118,9 +142,22 @@ export async function analyzeCombatVideoUrl(
             },
           },
           summary: { type: Type.STRING },
+          philosophicalCommentary: { type: Type.STRING },
+          segments: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                phase: { type: Type.STRING, enum: ["Opening", "Mid-Fight", "Critical Moment", "End Phase"] },
+                timestamp: { type: Type.STRING },
+                insight: { type: Type.STRING },
+              },
+              required: ["phase", "timestamp", "insight"],
+            },
+          },
           roundWinner: { type: Type.STRING, enum: ["Red", "Blue"] },
         },
-        required: ["scores", "summary"],
+        required: ["scores", "summary", "philosophicalCommentary", "segments", "fighterName"],
       },
     },
   });
@@ -151,6 +188,10 @@ export async function chatWithAICoach(
     
     Your goal is to explain these pillars in depth, providing detailed tracking of what is needed to develop specific skills.
     When an analysis is provided, focus on the gaps identified and provide actionable, intelligent advice based on physics, psychology, and martial arts science.
+    
+    FOUNDER & ORIGIN CONTEXT:
+    You are also the guardian of the TCHUNGU origin story. Use the following chapters from the Founder's Booklet to answer questions about the history, philosophy, and the journey of Bouabid Cherkaoui:
+    ${BOOKLET_CONTENT.map(c => `Chapter ${c.id}: ${c.title}\n${c.content}\nKey Idea: ${c.keyIdea}`).join('\n\n')}
     
     ${context ? `CONTEXT ANALYSIS:
     Summary: ${context.summary}

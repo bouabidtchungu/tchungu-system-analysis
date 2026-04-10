@@ -30,7 +30,10 @@ import {
   ArrowLeft,
   TrendingUp,
   Camera,
-  Link
+  Link,
+  BookOpen,
+  Scroll,
+  Quote
 } from "lucide-react";
 import { 
   Radar, 
@@ -53,6 +56,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { cn } from "./lib/utils";
 import { analyzeCombatMedia, analyzeCombatVideoUrl, chatWithAICoach } from "./services/geminiService";
 import { AnalysisResult, Pillar, Fighter, ChatMessage } from "./types";
+import { BOOKLET_CONTENT } from "./constants/booklet";
 import { auth, db, storage } from "./firebase";
 import { 
   onAuthStateChanged, 
@@ -95,7 +99,7 @@ const PILLAR_COLORS: Record<string, string> = {
   [Pillar.ULTIMATE]: "#ec4899",  // pink
 };
 
-type Tab = "analyze" | "fighters" | "history" | "system" | "ai-coach";
+type Tab = "analyze" | "fighters" | "history" | "system" | "ai-coach" | "founder";
 
 export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
@@ -110,6 +114,34 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isPlayingCommentary, setIsPlayingCommentary] = useState(false);
+
+  const playCommentary = useCallback((text: string) => {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    // Try to find a deep, professional sounding voice
+    const voices = window.speechSynthesis.getVoices();
+    const preferredVoice = voices.find(v => 
+      v.name.includes('Google UK English Male') || 
+      v.name.includes('Male') || 
+      v.lang.startsWith('en-GB')
+    );
+    
+    if (preferredVoice) utterance.voice = preferredVoice;
+    
+    utterance.rate = 0.85; // Calm, deliberate pacing
+    utterance.pitch = 0.8; // Deeper tone for philosophical weight
+    utterance.volume = 1.0;
+    
+    utterance.onstart = () => setIsPlayingCommentary(true);
+    utterance.onend = () => setIsPlayingCommentary(false);
+    utterance.onerror = () => setIsPlayingCommentary(false);
+    
+    window.speechSynthesis.speak(utterance);
+  }, []);
 
   // Fighter State
   const [fighters, setFighters] = useState<Fighter[]>([]);
@@ -142,6 +174,9 @@ export default function App() {
   const [chatContext, setChatContext] = useState<AnalysisResult | undefined>(undefined);
   const [chatSessions, setChatSessions] = useState<any[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+
+  // Booklet State
+  const [currentChapterIndex, setCurrentChapterIndex] = useState(0);
 
   // Auth Listener
   useEffect(() => {
@@ -236,14 +271,11 @@ export default function App() {
     setIsAnalyzing(true);
     setError(null);
     try {
-      let analysis;
-      if (videoUrl) {
-        analysis = await analyzeCombatVideoUrl(videoUrl);
-      } else {
-        const isPhoto = file!.type.startsWith("image/");
-        analysis = await analyzeCombatMedia(preview!, file!.type, isPhoto);
-      }
+      const analysis = await (videoUrl ? analyzeCombatVideoUrl(videoUrl) : analyzeCombatMedia(preview!, file!.type, file!.type.startsWith("image/")));
       setResult(analysis);
+      if (analysis.philosophicalCommentary) {
+        playCommentary(analysis.philosophicalCommentary);
+      }
     } catch (err) {
       console.error(err);
       setError("Failed to analyze media. Please try again.");
@@ -434,6 +466,12 @@ export default function App() {
               System
             </button>
             <button 
+              onClick={() => setActiveTab("founder")}
+              className={cn("hover:text-red-500 transition-colors", activeTab === "founder" && "text-red-500 opacity-100")}
+            >
+              Founder
+            </button>
+            <button 
               onClick={() => setActiveTab("ai-coach")}
               className={cn("hover:text-red-500 transition-colors", activeTab === "ai-coach" && "text-red-500 opacity-100")}
             >
@@ -613,7 +651,7 @@ export default function App() {
                       </button>
                       <div>
                         <h2 className="text-3xl font-black uppercase italic tracking-tighter">
-                          Analysis <span className="text-red-600">Report</span>
+                          {result?.fighterName || "Analysis"} <span className="text-red-600">Report</span>
                         </h2>
                         <p className="text-xs font-mono text-white/40 uppercase tracking-widest">
                           Session ID: {Math.random().toString(36).substring(7).toUpperCase()}
@@ -676,21 +714,80 @@ export default function App() {
 
                   <div className="grid lg:grid-cols-3 gap-8">
                     <div className="lg:col-span-1 space-y-6">
-                      <div className="aspect-[4/5] rounded-2xl overflow-hidden border border-white/10 bg-black relative">
+                      <div className="aspect-[4/5] rounded-2xl overflow-hidden border border-white/10 bg-black relative group">
                         {file?.type.startsWith("video/") ? (
                           <video src={preview!} controls className="w-full h-full object-cover" />
                         ) : (
                           <img src={preview!} className="w-full h-full object-cover" />
                         )}
+                        
+                        {/* Video Overlay Insights */}
+                        <AnimatePresence>
+                          {result?.philosophicalCommentary && (
+                            <motion.div 
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="absolute bottom-12 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent pointer-events-none"
+                            >
+                              <p className="text-lg font-serif italic text-white text-center leading-relaxed drop-shadow-lg">
+                                {result.philosophicalCommentary}
+                              </p>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
-                      <div className="p-6 bg-white/5 border border-white/10 rounded-2xl space-y-4">
-                        <div className="flex items-center gap-2 text-red-500">
-                          <Info className="w-4 h-4" />
-                          <h4 className="text-xs font-bold uppercase tracking-widest">Executive Summary</h4>
+
+                      {/* Philosophical Commentary Section */}
+                      <div className="p-8 bg-white/5 border border-white/10 rounded-2xl space-y-6 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-4 opacity-10">
+                          <Brain className="w-24 h-24" />
                         </div>
-                        <p className="text-sm text-white/70 leading-relaxed italic font-serif italic">
-                          "{result?.summary}"
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-red-500">
+                            <Shield className="w-4 h-4" />
+                            <h4 className="text-xs font-bold uppercase tracking-widest">TCHUNGU Insight</h4>
+                          </div>
+                          <button 
+                            onClick={() => playCommentary(result?.philosophicalCommentary || "")}
+                            className={cn(
+                              "p-2 rounded-full border border-white/10 transition-all",
+                              isPlayingCommentary ? "bg-red-600 text-white animate-pulse" : "hover:bg-white/10 text-white/40"
+                            )}
+                          >
+                            <Play className={cn("w-4 h-4", isPlayingCommentary && "fill-current")} />
+                          </button>
+                        </div>
+                        <p className="text-2xl font-serif italic text-white leading-relaxed tracking-tight">
+                          {result?.philosophicalCommentary}
                         </p>
+                        <div className="h-px w-12 bg-red-600" />
+                        <p className="text-xs text-white/40 leading-relaxed uppercase tracking-widest">
+                          {result?.summary}
+                        </p>
+                      </div>
+
+                      {/* Fight Segmentation */}
+                      <div className="p-6 bg-white/5 border border-white/10 rounded-2xl space-y-4">
+                        <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">Fight Segmentation</h4>
+                        <div className="space-y-4">
+                          {result?.segments?.map((segment, idx) => (
+                            <div key={idx} className="flex gap-4 group">
+                              <div className="flex flex-col items-center gap-1">
+                                <div className="w-2 h-2 rounded-full bg-red-600" />
+                                {idx !== result.segments!.length - 1 && <div className="w-px flex-1 bg-white/10" />}
+                              </div>
+                              <div className="pb-4">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-[10px] font-mono text-red-500">{segment.timestamp}</span>
+                                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/60">{segment.phase}</span>
+                                </div>
+                                <p className="text-xs text-white/40 group-hover:text-white/80 transition-colors">
+                                  {segment.insight}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
 
@@ -1161,6 +1258,150 @@ export default function App() {
               </div>
             </motion.div>
           )}
+
+          {activeTab === "founder" && (
+            <motion.div
+              key="founder"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-12"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-3xl font-black uppercase italic tracking-tighter">
+                    The <span className="text-red-600">Origin</span>
+                  </h2>
+                  <p className="text-xs font-mono text-white/40 uppercase tracking-widest">
+                    Bouabid Cherkaoui & The Birth of TCHUNGU
+                  </p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-full">
+                    <Scroll className="w-3 h-3 text-red-500" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">
+                      Chapter {currentChapterIndex + 1} of {BOOKLET_CONTENT.length}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid lg:grid-cols-4 gap-12">
+                {/* Chapter Navigation */}
+                <div className="lg:col-span-1 space-y-2">
+                  <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-4 px-4">Chapters</h4>
+                  {BOOKLET_CONTENT.map((chapter, idx) => (
+                    <button
+                      key={chapter.id}
+                      onClick={() => setCurrentChapterIndex(idx)}
+                      className={cn(
+                        "w-full text-left px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all border",
+                        currentChapterIndex === idx 
+                          ? "bg-red-600 border-red-600 text-white shadow-lg shadow-red-600/20" 
+                          : "bg-white/5 border-white/5 text-white/40 hover:bg-white/10 hover:border-white/10"
+                      )}
+                    >
+                      {idx + 1}. {chapter.title.split(' (')[0]}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Reading Interface */}
+                <div className="lg:col-span-3 space-y-8">
+                  <div className="p-12 bg-white/5 border border-white/10 rounded-3xl relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-12 opacity-[0.02] pointer-events-none group-hover:opacity-[0.05] transition-opacity">
+                      <BookOpen className="w-64 h-64" />
+                    </div>
+                    
+                    <motion.div
+                      key={currentChapterIndex}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="space-y-8 relative z-10"
+                    >
+                      <div className="space-y-2">
+                        <span className="text-red-600 font-mono text-sm font-bold uppercase tracking-[0.3em]">Chapter {BOOKLET_CONTENT[currentChapterIndex].id}</span>
+                        <h3 className="text-4xl font-black uppercase italic tracking-tighter leading-none">
+                          {BOOKLET_CONTENT[currentChapterIndex].title}
+                        </h3>
+                      </div>
+
+                      <div className="prose prose-invert max-w-none">
+                        <p className="text-xl text-white/80 leading-relaxed font-serif italic">
+                          {BOOKLET_CONTENT[currentChapterIndex].content}
+                        </p>
+                      </div>
+
+                      <div className="p-6 bg-red-600/10 border border-red-600/20 rounded-2xl flex items-start gap-4">
+                        <Quote className="w-6 h-6 text-red-600 shrink-0" />
+                        <div>
+                          <p className="text-[10px] uppercase tracking-widest text-red-500 font-bold mb-1">Core Insight</p>
+                          <p className="text-lg font-black uppercase italic tracking-tight text-white">
+                            {BOOKLET_CONTENT[currentChapterIndex].keyIdea}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-8 border-t border-white/10">
+                        <div className="flex gap-4">
+                          <button
+                            disabled={currentChapterIndex === 0}
+                            onClick={() => setCurrentChapterIndex(prev => prev - 1)}
+                            className="px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all disabled:opacity-20"
+                          >
+                            Previous
+                          </button>
+                          <button
+                            disabled={currentChapterIndex === BOOKLET_CONTENT.length - 1}
+                            onClick={() => setCurrentChapterIndex(prev => prev + 1)}
+                            className="px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all disabled:opacity-20"
+                          >
+                            Next
+                          </button>
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            setActiveTab("ai-coach");
+                            const initialMsg: ChatMessage = {
+                              role: "model",
+                              content: `I see you're reading Chapter ${BOOKLET_CONTENT[currentChapterIndex].id}: ${BOOKLET_CONTENT[currentChapterIndex].title}. This part of the TCHUNGU origin story is fascinating. How can I help you understand the philosophical depth or the practical lessons from this chapter?`,
+                              timestamp: new Date().toISOString()
+                            };
+                            setChatMessages([initialMsg]);
+                          }}
+                          className="flex items-center gap-3 px-8 py-3 bg-white text-black hover:bg-red-600 hover:text-white rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all"
+                        >
+                          <Brain className="w-4 h-4" />
+                          Ask AI about this chapter
+                        </button>
+                      </div>
+                    </motion.div>
+                  </div>
+
+                  {/* Contextual Link to Analysis */}
+                  {result && (
+                    <div className="p-8 bg-gradient-to-br from-red-600/20 to-transparent border border-red-600/20 rounded-3xl flex items-center justify-between gap-8">
+                      <div className="space-y-2">
+                        <h4 className="text-lg font-black uppercase italic tracking-tight">Contextual Connection</h4>
+                        <p className="text-sm text-white/60 leading-relaxed max-w-xl">
+                          Your current analysis of <span className="text-white font-bold">{result.fighterName}</span> shows a gap in <span className="text-red-500 font-bold">{result.scores.sort((a,b) => a.score - b.score)[0].pillar}</span>. 
+                          This directly relates to the lessons of adaptation mentioned in the founder's journey.
+                        </p>
+                      </div>
+                      <button 
+                        onClick={() => setActiveTab("ai-coach")}
+                        className="shrink-0 px-6 py-3 bg-red-600 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-red-700 transition-all"
+                      >
+                        Deep Dive with AI
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {activeTab === "ai-coach" && (
             <motion.div
               key="ai-coach"

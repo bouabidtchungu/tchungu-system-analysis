@@ -1,6 +1,6 @@
 {
-  "name": "Remix: TCHUNGU System",
-  "description": "AI-Powered Combat Sports Adjudication using the 7-Pillar Framework (Technique, Combat, Harmony, Union, Notes, Gesture, Ultimate).",
+  "name": "TCHUNGU AI Analyst",
+  "description": "Philosophical AI-powered combat sports analysis. Revealing underlying patterns and human behavior through the 7-Pillar TCHUNGU framework.",
   "requestFramePermissions": [
     "camera"
   ]
