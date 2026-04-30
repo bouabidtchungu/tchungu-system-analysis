@@ -1,14 +1,28 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { AnalysisResult, Pillar, ChatMessage } from "../types";
+import { AnalysisResult, Pillar, ChatMessage, Division } from "../types";
 import { BOOKLET_CONTENT } from "../constants/booklet";
+import { Language } from "../constants/translations";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+let aiInstance: GoogleGenAI | null = null;
+
+function getAI() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is missing. Please set it in the environment variables.");
+  }
+  if (!aiInstance) {
+    aiInstance = new GoogleGenAI({ apiKey });
+  }
+  return aiInstance;
+}
 
 export async function analyzeCombatMedia(
   fileData: string,
   mimeType: string,
-  isPhoto: boolean
+  isPhoto: boolean,
+  lang: Language = "en"
 ): Promise<AnalysisResult> {
+  const ai = getAI();
   const prompt = `
     Analyze this combat sports ${isPhoto ? "photo" : "video"} using the TCHUNGU 7-Pillar Framework.
     
@@ -27,6 +41,10 @@ export async function analyzeCombatMedia(
     3. Generate a "Philosophical Commentary" in the TCHUNGU style: short sentences, deep meaning, minimal explanation, impactful tone.
     4. Incorporate the TCHUNGU philosophy into the commentary (e.g., mention how the fighter's movement aligns with the pillars).
     5. Segment the match into phases: Opening, Mid-Fight, Critical Moment, End Phase.
+    6. Generate "Intelligence Insights": Identify specific moments (timestamps in seconds) where key events occur (Errors, Opportunities, Successful execution, Strategic insights, Energy inefficiency, Transition issues). Map these to the 7 pillars.
+    7. Detect the dominant "TCHUNGU Division" being displayed: Hand Striking, Full Striking, Striking & Takedown, Ground Fighting, Mixed Combat, Grappling, Tactical Defense, or Personal Protection.
+    
+    LANGUAGE: Generate all text in ${lang === 'ar' ? 'Arabic' : lang === 'fr' ? 'French' : lang === 'zh' ? 'Chinese' : 'English'}.
   `;
 
   const response = await ai.models.generateContent({
@@ -77,8 +95,24 @@ export async function analyzeCombatMedia(
             },
           },
           roundWinner: { type: Type.STRING, enum: ["Red", "Blue"] },
+          dominantDivision: { type: Type.STRING, enum: Object.values(Division) },
+          intelligenceInsights: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                timestamp: { type: Type.NUMBER },
+                type: { type: Type.STRING, enum: ["Error", "Opportunity", "Execution", "Strategy", "Inefficiency", "Transition"] },
+                pillar: { type: Type.STRING, enum: Object.values(Pillar) },
+                message: { type: Type.STRING },
+                explanation: { type: Type.STRING },
+                severity: { type: Type.STRING, enum: ["low", "medium", "high"] },
+              },
+              required: ["timestamp", "type", "pillar", "message", "explanation", "severity"],
+            },
+          },
         },
-        required: ["scores", "summary", "philosophicalCommentary", "segments", "fighterName"],
+        required: ["scores", "summary", "philosophicalCommentary", "segments", "fighterName", "intelligenceInsights", "dominantDivision"],
       },
     },
   });
@@ -91,8 +125,10 @@ export async function analyzeCombatMedia(
 }
 
 export async function analyzeCombatVideoUrl(
-  videoUrl: string
+  videoUrl: string,
+  lang: Language = "en"
 ): Promise<AnalysisResult> {
+  const ai = getAI();
   const prompt = `
     Analyze the combat sports video at this URL: ${videoUrl}
     
@@ -113,6 +149,10 @@ export async function analyzeCombatVideoUrl(
     3. Generate a "Philosophical Commentary" in the TCHUNGU style: short sentences, deep meaning, minimal explanation, impactful tone.
     4. Explain the TCHUNGU philosophy through this commentary, linking the fighter's actions to the 7 pillars.
     5. Segment the match into phases: Opening, Mid-Fight, Critical Moment, End Phase.
+    6. Generate "Intelligence Insights": Identify specific moments (timestamps in seconds) where key events occur (Errors, Opportunities, Successful execution, Strategic insights, Energy inefficiency, Transition issues). Map these to the 7 pillars.
+    7. Detect the dominant "TCHUNGU Division" being displayed: Hand Striking, Full Striking, Striking & Takedown, Ground Fighting, Mixed Combat, Grappling, Tactical Defense, or Personal Protection.
+    
+    LANGUAGE: Generate all text in ${lang === 'ar' ? 'Arabic' : lang === 'fr' ? 'French' : lang === 'zh' ? 'Chinese' : 'English'}.
   `;
 
   const response = await ai.models.generateContent({
@@ -123,7 +163,6 @@ export async function analyzeCombatVideoUrl(
       },
     ],
     config: {
-      tools: [{ googleSearch: {} }, { urlContext: {} }],
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
@@ -156,8 +195,24 @@ export async function analyzeCombatVideoUrl(
             },
           },
           roundWinner: { type: Type.STRING, enum: ["Red", "Blue"] },
+          dominantDivision: { type: Type.STRING, enum: Object.values(Division) },
+          intelligenceInsights: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                timestamp: { type: Type.NUMBER },
+                type: { type: Type.STRING, enum: ["Error", "Opportunity", "Execution", "Strategy", "Inefficiency", "Transition"] },
+                pillar: { type: Type.STRING, enum: Object.values(Pillar) },
+                message: { type: Type.STRING },
+                explanation: { type: Type.STRING },
+                severity: { type: Type.STRING, enum: ["low", "medium", "high"] },
+              },
+              required: ["timestamp", "type", "pillar", "message", "explanation", "severity"],
+            },
+          },
         },
-        required: ["scores", "summary", "philosophicalCommentary", "segments", "fighterName"],
+        required: ["scores", "summary", "philosophicalCommentary", "segments", "fighterName", "intelligenceInsights", "dominantDivision"],
       },
     },
   });
@@ -172,8 +227,10 @@ export async function analyzeCombatVideoUrl(
 export async function chatWithAICoach(
   message: string,
   history: ChatMessage[],
+  lang: Language = "en",
   context?: AnalysisResult
 ): Promise<string> {
+  const ai = getAI();
   const systemInstruction = `
     You are the TCHUNGU AI Coach, a professional specialist in combat sports adjudication and fighter development.
     Your expertise is built on the 7-Pillar Framework:
@@ -191,12 +248,27 @@ export async function chatWithAICoach(
     
     FOUNDER & ORIGIN CONTEXT:
     You are also the guardian of the TCHUNGU origin story. Use the following chapters from the Founder's Booklet to answer questions about the history, philosophy, and the journey of Bouabid Cherkaoui:
-    ${BOOKLET_CONTENT.map(c => `Chapter ${c.id}: ${c.title}\n${c.content}\nKey Idea: ${c.keyIdea}`).join('\n\n')}
+    ${BOOKLET_CONTENT[lang].map(c => `Chapter ${c.id}: ${c.title}\n${c.content}\nKey Idea: ${c.keyIdea}`).join('\n\n')}
+    
+    TCHUNGU DIVISIONS:
+    TCHUNGU is an adaptive system with 8 divisions:
+    1. Hand Striking: Precision, timing, distance, angles.
+    2. Full Striking: Hands + Legs coordination.
+    3. Striking & Takedown: Transition from striking to control.
+    4. Ground Fighting: Control, submission, positioning.
+    5. Mixed Combat: Full integration of all elements.
+    6. Grappling: Control without striking.
+    7. Tactical Defense: Real-world self-defense.
+    8. Personal Protection: Avoidance and minimal engagement.
     
     ${context ? `CONTEXT ANALYSIS:
+    Fighter: ${context.fighterName}
+    Dominant Division: ${context.dominantDivision}
     Summary: ${context.summary}
     Scores: ${context.scores.map(s => `${s.pillar}: ${s.score}/10 - ${s.description}`).join('\n')}
     ` : ''}
+    
+    LANGUAGE: Always respond in ${lang === 'ar' ? 'Arabic' : lang === 'fr' ? 'French' : lang === 'zh' ? 'Chinese' : 'English'}.
     
     Be precise, professional, and encouraging. Use your knowledge of physics and engineering to explain body mechanics.
   `;

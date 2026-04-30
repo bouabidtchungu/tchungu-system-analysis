@@ -8,10 +8,30 @@ export enum Pillar {
   ULTIMATE = "Ultimate",
 }
 
+export enum Division {
+  HAND_STRIKING = "Hand Striking",
+  FULL_STRIKING = "Full Striking",
+  STRIKING_TAKEDOWN = "Striking & Takedown",
+  GROUND_FIGHTING = "Ground Fighting",
+  MIXED_COMBAT = "Mixed Combat",
+  GRAPPLING = "Grappling",
+  TACTICAL_DEFENSE = "Tactical Defense",
+  PERSONAL_PROTECTION = "Personal Protection",
+}
+
 export interface PillarScore {
   pillar: Pillar;
   score: number; // 0-10
   description: string;
+}
+
+export interface IntelligenceInsight {
+  timestamp: number; // in seconds
+  type: "Error" | "Opportunity" | "Execution" | "Strategy" | "Inefficiency" | "Transition";
+  pillar: Pillar;
+  message: string;
+  explanation: string;
+  severity: "low" | "medium" | "high";
 }
 
 export interface AnalysisResult {
@@ -26,6 +46,8 @@ export interface AnalysisResult {
     timestamp: string;
     insight: string;
   }[]; // New: Fight segmentation
+  intelligenceInsights?: IntelligenceInsight[]; // New: Real-time interpretive layer
+  dominantDivision?: Division; // New: Detected combat division
   roundWinner?: "Red" | "Blue";
   timestamp: string;
   ownerId?: string;
